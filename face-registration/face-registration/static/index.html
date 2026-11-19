@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Face Registration</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 3rem;
+    }
+
+    /* ── Header ── */
+    .header { text-align: center; margin-bottom: 1.75rem; }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #2b6cb0;
+      letter-spacing: -0.3px;
+    }
+    .header p { font-size: 0.83rem; color: #718096; margin-top: 0.2rem; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      padding: 4px;
+      gap: 2px;
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.42rem 1.5rem;
+      border: none;
+      background: transparent;
+      color: #718096;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: #2b6cb0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1.6rem 1.5rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    /* ── Name input ── */
+    .field { margin-bottom: 1rem; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .field input {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      background: #f7fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 0.6rem;
+      color: #1a202c;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field input:focus {
+      border-color: #63b3ed;
+      box-shadow: 0 0 0 3px rgba(99,179,237,0.18);
+    }
+
+    /* ── Step indicator ── */
+    .steps-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      margin-bottom: 0.9rem;
+    }
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      transition: background 0.3s;
+    }
+    .step-dot.done  { background: #48bb78; }
+    .step-dot.active { background: #4299e1; transform: scale(1.3); }
+
+    /* ── Camera round box ── */
+    .cam-outer {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 0 auto 0.6rem;
+    }
+    .cam-round {
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: #edf2f7;
+      border: 3px solid #bee3f8;
+      position: relative;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .cam-round.ok   { border-color: #68d391; box-shadow: 0 0 0 5px rgba(104,211,145,0.22); }
+    .cam-round.idle { border-color: #e2e8f0; }
+    .cam-round video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scaleX(-1);
+    }
+    .cam-round canvas { display: none; }
+
+    /* Placeholder icon when cam is off */
+    .cam-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      pointer-events: none;
+    }
+    .cam-placeholder .cam-icon {
+      font-size: 3.2rem;
+      opacity: 0.22;
+    }
+    .cam-placeholder .cam-hint {
+      font-size: 0.75rem;
+      color: #b0bec5;
+      font-weight: 500;
+    }
+
+    /* Step hint shown BELOW the camera circle, not inside it */
+    .cam-hint-bar {
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a90d9;
+      min-height: 1.2rem;
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.1px;
+    }
+    .cam-hint-bar.go { color: #38a169; }
+
+    /* ── Thumbnails ── */
+    .thumbs {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1.1rem;
+    }
+    .thumb-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .thumb-slot .lbl {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #a0aec0;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .thumb-box {
+      width: 80px; height: 80px;
+      border-radius: 0.7rem;
+      background: #f7fafc;
+      border: 2px dashed #cbd5e0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .thumb-box.captured {
+      border: 2px solid #68d391;
+      box-shadow: 0 0 0 3px rgba(104,211,145,0.18);
+    }
+    .thumb-box img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
+    }
+    .btn {
+      flex: 1;
+      padding: 0.62rem 0.5rem;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 0.65rem;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .btn-primary {
+      background: #3182ce;
+      color: #fff;
+    }
+    .btn-primary:hover  { background: #2b6cb0; }
+    .btn-primary:disabled { background: #bee3f8; color: #fff; cursor: not-allowed; }
+
+    .btn-outline {
+      background: #fff;
+      color: #4a5568;
+      border: 1.5px solid #e2e8f0;
+    }
+    .btn-outline:hover { border-color: #a0aec0; color: #2d3748; }
+
+    .btn-ghost {
+      background: #fff0f0;
+      color: #e53e3e;
+      border: 1.5px solid #fed7d7;
+      flex: 0 0 auto;
+      padding: 0.62rem 0.85rem;
+    }
+    .btn-ghost:hover { background: #fff5f5; }
+
+    .btn-success {
+      background: #38a169;
+      color: #fff;
+    }
+    .btn-success:hover  { background: #276749; }
+    .btn-success:disabled { background: #9ae6b4; cursor: not-allowed; }
+
+    /* ── Processing overlay ── */
+    .processing-overlay {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      padding: 2rem 0 1rem;
+    }
+    .processing-overlay.show { display: flex; }
+    .proc-spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #bee3f8;
+      border-top-color: #3182ce;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .proc-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #2b6cb0;
+    }
+    .proc-sub {
+      font-size: 0.78rem;
+      color: #718096;
+    }
+
+    /* ── Success screen ── */
+    .success-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 1.5rem 0 0.5rem;
+      text-align: center;
+    }
+    .success-screen.show { display: flex; }
+    .success-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: #f0fff4;
+      border: 3px solid #68d391;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.4); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .success-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #22543d;
+    }
+    .success-msg {
+      font-size: 0.82rem;
+      color: #68d391;
+      font-weight: 600;
+    }
+    .success-again {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #3182ce;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+    }
+
+    /* ── Error pill ── */
+    .err-pill {
+      display: none;
+      padding: 0.6rem 0.9rem;
+      background: #fff5f5;
+      border: 1.5px solid #fed7d7;
+      border-radius: 0.6rem;
+      color: #c53030;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+    .err-pill.show { display: block; }
+
+    /* ── Verify match card ── */
+    .match-card {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 1.1rem;
+      border-radius: 0.85rem;
+      margin-top: 0.75rem;
+      text-align: center;
+    }
+    .match-card.show  { display: flex; }
+    .match-card.match { background: #f0fff4; border: 1.5px solid #9ae6b4; }
+    .match-card.nomatch { background: #fff5f5; border: 1.5px solid #fed7d7; }
+    .match-icon { font-size: 2.2rem; }
+    .match-name { font-size: 1.15rem; font-weight: 700; color: #22543d; }
+    .match-conf { font-size: 0.78rem; color: #718096; }
+    .no-match-txt { font-size: 1rem; font-weight: 700; color: #c53030; }
+
+    /* ── Spinner anim ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .mini-spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    /* ── Panel ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: #edf2f7;
+      margin: 0.85rem 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Face Registration</h1>
+    <p>Live camera · Register &amp; verify students</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('register', this)">Register</button>
+    <button class="tab-btn"        onclick="switchTab('verify',   this)">Verify</button>
+  </div>
+
+  <!-- ════════════════════════════════════
+       REGISTER PANEL
+  ════════════════════════════════════ -->
+  <div id="panel-register" class="card panel active">
+
+    <!-- Name -->
+    <div class="field">
+      <label for="studentName">Student Name</label>
+      <input type="text" id="studentName" placeholder="Enter full name" autocomplete="off"/>
+    </div>
+
+    <!-- Step dots -->
+    <div class="steps-row" id="step-dots">
+      <div class="step-dot active" id="dot-0"></div>
+      <div class="step-dot"        id="dot-1"></div>
+      <div class="step-dot"        id="dot-2"></div>
+    </div>
+
+    <!-- Main form view (hidden when processing/success) -->
+    <div id="reg-form-view">
+
+      <!-- Round camera box -->
+      <div class="cam-outer">
+        <div class="cam-round idle" id="reg-cam-round">
+          <video id="reg-video" autoplay playsinline muted></video>
+          <canvas id="reg-canvas"></canvas>
+
+          <!-- Placeholder -->
+          <div class="cam-placeholder" id="reg-placeholder">
+            <div class="cam-icon">📷</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step hint below the circle -->
+      <div class="cam-hint-bar" id="reg-badge">Click "Start Camera" to begin</div>
+
+      <!-- 3 thumbnail boxes -->
+      <div class="thumbs">
+        <div class="thumb-slot">
+          <div class="thumb-box" id="thumb-front"></div>
+          <span class="lbl">Front</span>
+        </div>
+        <div class="thumb-slot">
+          <div class="thumb-box" id="thumb-left"></div>
+          <span class="lbl">Left</span>
+        </div>
+        <div class="thumb-slot">
+          <div class="thumb-box" id="thumb-right"></div>
+          <span class="lbl">Right</span>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="btn-row">
+        <button class="btn btn-outline" id="reg-cam-btn" onclick="toggleRegCam()">Start Camera</button>
+        <button class="btn btn-primary" id="reg-snap-btn" onclick="snapShot()" disabled>Capture</button>
+        <button class="btn btn-ghost"   onclick="resetReg()" title="Reset">↺</button>
+      </div>
+      <button class="btn btn-success" id="reg-submit-btn" onclick="registerFace()" disabled
+              style="width:100%">Register Face</button>
+
+      <div class="err-pill" id="reg-err"></div>
+    </div>
+
+    <!-- Processing view -->
+    <div class="processing-overlay" id="reg-processing">
+      <div class="proc-spinner"></div>
+      <div class="proc-label">Processing…</div>
+      <div class="proc-sub">Extracting face embeddings from 3 angles</div>
+    </div>
+
+    <!-- Success view -->
+    <div class="success-screen" id="reg-success">
+      <div class="success-icon">✓</div>
+      <div class="success-name" id="success-name"></div>
+      <div class="success-msg">Registered successfully!</div>
+      <button class="success-again" onclick="resetReg()">Register another student</button>
+    </div>
+
+  </div><!-- /panel-register -->
+
+  <!-- ════════════════════════════════════
+       VERIFY PANEL
+  ════════════════════════════════════ -->
+  <div id="panel-verify" class="card panel">
+
+    <div id="ver-form-view">
+      <!-- Round camera box -->
+      <div class="cam-outer">
+        <div class="cam-round idle" id="ver-cam-round">
+          <video id="ver-video" autoplay playsinline muted></video>
+          <canvas id="ver-canvas"></canvas>
+
+          <div class="cam-placeholder" id="ver-placeholder">
+            <div class="cam-icon">🔍</div>
+          </div>
+        </div>
+      </div>
+      <div class="cam-hint-bar" id="ver-badge">Click "Start Camera" to begin</div>
+
+      <div class="btn-row" style="margin-top:0.4rem">
+        <button class="btn btn-outline" id="ver-cam-btn" onclick="toggleVerCam()">Start Camera</button>
+        <button class="btn btn-primary" id="ver-snap-btn" onclick="verifySnap()" disabled>Capture &amp; Verify</button>
+      </div>
+
+      <!-- Processing view for verify -->
+      <div class="processing-overlay" id="ver-processing">
+        <div class="proc-spinner"></div>
+        <div class="proc-label">Verifying…</div>
+        <div class="proc-sub">Comparing face against registered students</div>
+      </div>
+
+      <!-- Match result card -->
+      <div class="match-card" id="match-card">
+        <div class="match-icon" id="match-icon"></div>
+        <div id="match-name-el"></div>
+        <div class="match-conf" id="match-conf"></div>
+        <button class="success-again" onclick="resetVerResult()">Try again</button>
+      </div>
+
+      <div class="err-pill" id="ver-err"></div>
+    </div>
+
+  </div><!-- /panel-verify -->
+
+  <script>
+    const API = "http://localhost:8000";
+
+    const STEPS = [
+      { key: "front", label: "Look straight ahead", thumb: "thumb-front" },
+      { key: "left",  label: "Turn head LEFT",      thumb: "thumb-left"  },
+      { key: "right", label: "Turn head RIGHT",      thumb: "thumb-right" },
+    ];
+
+    let regStream = null;
+    let verStream = null;
+    let regStep   = 0;
+    const captured = {};
+
+    /* ── util ── */
+    function showErr(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+    function hideErr(id) {
+      const el = document.getElementById(id);
+      el.textContent = "";
+      el.classList.remove("show");
+    }
+    function stopStream(s) { s && s.getTracks().forEach(t => t.stop()); }
+
+    /* ── tab switch ── */
+    function switchTab(tab, btn) {
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("panel-" + tab).classList.add("active");
+      btn.classList.add("active");
+      if (tab === "register") { stopStream(verStream); verStream = null; resetVerUI(); }
+      if (tab === "verify")   { stopStream(regStream); regStream = null; resetRegUI(); }
+    }
+
+    /* ═══════════════════════════════════════
+       REGISTER
+    ═══════════════════════════════════════ */
+    async function toggleRegCam() {
+      if (regStream) {
+        stopStream(regStream); regStream = null; resetRegUI(); return;
+      }
+      try {
+        regStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 } }, audio: false
+        });
+        const vid = document.getElementById("reg-video");
+        vid.srcObject = regStream;
+        document.getElementById("reg-placeholder").style.display = "none";
+        document.getElementById("reg-cam-round").classList.remove("idle");
+        document.getElementById("reg-cam-btn").textContent = "Stop";
+        document.getElementById("reg-snap-btn").disabled = false;
+        regStep = 0;
+        updateRegUI();      } catch (e) {
+        showErr("reg-err", "Camera access denied: " + e.message);
+      }
+    }
+
+    function updateRegUI() {
+      // dots
+      STEPS.forEach((_, i) => {
+        const d = document.getElementById("dot-" + i);
+        d.className = "step-dot" + (i < regStep ? " done" : i === regStep ? " active" : "");
+      });
+
+      const badge = document.getElementById("reg-badge");
+      if (regStep < STEPS.length) {
+        badge.textContent = `Step ${regStep + 1} of 3 — ${STEPS[regStep].label}`;
+        badge.className   = "cam-hint-bar";
+        document.getElementById("reg-cam-round").classList.remove("ok");
+      } else {
+        badge.textContent = "All 3 captured — ready to register";
+        badge.className   = "cam-hint-bar go";
+        document.getElementById("reg-cam-round").classList.add("ok");
+      }
+      document.getElementById("reg-submit-btn").disabled = regStep < 3;
+      document.getElementById("reg-snap-btn").disabled   = !regStream || regStep >= 3;
+    }
+
+    function snapShot() {
+      if (!regStream || regStep >= STEPS.length) return;
+
+      const video  = document.getElementById("reg-video");
+      const canvas = document.getElementById("reg-canvas");
+      canvas.width  = video.videoWidth  || 640;
+      canvas.height = video.videoHeight || 480;
+      // mirror match
+      const ctx = canvas.getContext("2d");
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0);
+
+      // flash ring
+      const round = document.getElementById("reg-cam-round");
+      round.style.borderColor = "#68d391";
+      setTimeout(() => { if (!round.classList.contains("ok")) round.style.borderColor = ""; }, 350);
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      const thumb   = document.getElementById(STEPS[regStep].thumb);
+      thumb.innerHTML = `<img src="${dataUrl}" alt="${STEPS[regStep].key}"/>`;
+      thumb.classList.add("captured");
+
+      canvas.toBlob(blob => {
+        captured[STEPS[regStep].key] = blob;
+        regStep++;
+        updateRegUI();
+      }, "image/jpeg", 0.92);
+    }
+
+    function resetReg() {
+      stopStream(regStream); regStream = null;
+      resetRegUI();
+      // hide processing / success, show form
+      document.getElementById("reg-form-view").style.display   = "";
+      document.getElementById("reg-processing").classList.remove("show");
+      document.getElementById("reg-success").classList.remove("show");
+    }
+
+    function resetRegUI() {
+      const vid = document.getElementById("reg-video");
+      vid.srcObject = null;
+      document.getElementById("reg-placeholder").style.display = "";
+      document.getElementById("reg-cam-round").className = "cam-round idle";
+      document.getElementById("reg-cam-btn").textContent  = "Start Camera";
+      document.getElementById("reg-snap-btn").disabled    = true;
+      document.getElementById("reg-submit-btn").disabled  = true;
+      document.getElementById("reg-badge").textContent    = "Click \"Start Camera\" to begin";
+      document.getElementById("reg-badge").className      = "cam-hint-bar";
+      STEPS.forEach(s => {
+        const t = document.getElementById(s.thumb);
+        t.innerHTML = "";
+        t.classList.remove("captured");
+      });
+      ["front","left","right"].forEach(k => delete captured[k]);
+      regStep = 0;
+      STEPS.forEach((_, i) => {
+        document.getElementById("dot-" + i).className = "step-dot" + (i === 0 ? " active" : "");
+      });
+      hideErr("reg-err");
+    }
+
+    async function registerFace() {
+      const name = document.getElementById("studentName").value.trim();
+      if (!name) return showErr("reg-err", "Please enter a student name.");
+      if (!captured.front || !captured.left || !captured.right)
+        return showErr("reg-err", "Capture all 3 face angles first.");
+      hideErr("reg-err");
+
+      // stop cam, show processing
+      stopStream(regStream); regStream = null;
+      document.getElementById("reg-form-view").style.display    = "none";
+      document.getElementById("reg-processing").classList.add("show");
+      document.getElementById("reg-success").classList.remove("show");
+
+      const fd = new FormData();
+      fd.append("name",         name);
+      fd.append("front_image",  captured.front, "front.jpg");
+      fd.append("left_image",   captured.left,  "left.jpg");
+      fd.append("right_image",  captured.right, "right.jpg");
+
+      try {
+        const res  = await fetch(`${API}/register`, { method: "POST", body: fd });
+        const data = await res.json();
+
+        document.getElementById("reg-processing").classList.remove("show");
+
+        if (res.ok) {
+          // Show success screen
+          document.getElementById("success-name").textContent = name;
+          document.getElementById("reg-success").classList.add("show");
+          document.getElementById("studentName").value = "";
+          // clear captured state silently
+          ["front","left","right"].forEach(k => delete captured[k]);
+          regStep = 0;
+        } else {
+          document.getElementById("reg-form-view").style.display = "";
+          showErr("reg-err", data.detail || "Registration failed. Try again.");
+        }
+      } catch (err) {
+        document.getElementById("reg-processing").classList.remove("show");
+        document.getElementById("reg-form-view").style.display = "";
+        showErr("reg-err", "Network error: " + err.message);
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       VERIFY
+    ═══════════════════════════════════════ */
+    async function toggleVerCam() {
+      if (verStream) {
+        stopStream(verStream); verStream = null; resetVerUI(); return;
+      }
+      try {
+        verStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 } }, audio: false
+        });
+        document.getElementById("ver-video").srcObject = verStream;
+        document.getElementById("ver-placeholder").style.display = "none";
+        document.getElementById("ver-cam-round").classList.remove("idle");
+        document.getElementById("ver-cam-btn").textContent  = "Stop";
+        document.getElementById("ver-snap-btn").disabled    = false;
+        document.getElementById("ver-badge").textContent    = "Position your face in the oval";
+      } catch (e) {
+        showErr("ver-err", "Camera access denied: " + e.message);
+      }
+    }
+
+    async function verifySnap() {
+      if (!verStream) return;
+
+      const video  = document.getElementById("ver-video");
+      const canvas = document.getElementById("ver-canvas");
+      canvas.width  = video.videoWidth  || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0);
+
+      // Flash
+      const round = document.getElementById("ver-cam-round");
+      round.style.borderColor = "#63b3ed";
+      setTimeout(() => round.style.borderColor = "", 350);
+
+      // Show processing
+      document.getElementById("ver-snap-btn").disabled  = true;
+      document.getElementById("ver-cam-btn").disabled   = true;
+      document.getElementById("ver-processing").classList.add("show");
+      document.getElementById("match-card").classList.remove("show");
+      hideErr("ver-err");
+      document.getElementById("ver-badge").textContent = "Analyzing…";
+
+      canvas.toBlob(async blob => {
+        const fd = new FormData();
+        fd.append("verify_image", blob, "verify.jpg");
+        try {
+          const res  = await fetch(`${API}/verify`, { method: "POST", body: fd });
+          const data = await res.json();
+          document.getElementById("ver-processing").classList.remove("show");
+
+          const card = document.getElementById("match-card");
+          if (res.ok) {
+            if (data.status === "match") {
+              card.className = "match-card show match";
+              document.getElementById("match-icon").textContent = "✅";
+              const nameEl = document.getElementById("match-name-el");
+              const nameDiv = document.createElement("div");
+              nameDiv.className = "match-name";
+              nameDiv.textContent = data.name;   // textContent — safe, no XSS
+              nameEl.replaceChildren(nameDiv);
+              document.getElementById("match-conf").textContent =
+                `Confidence: ${data.confidence}%`;
+              document.getElementById("ver-badge").textContent = "Matched!";
+              document.getElementById("ver-badge").className   = "cam-hint-bar go";
+              document.getElementById("ver-cam-round").classList.add("ok");
+            } else {
+              card.className = "match-card show nomatch";
+              document.getElementById("match-icon").textContent = "❌";
+              const noNameEl = document.getElementById("match-name-el");
+              const noNameDiv = document.createElement("div");
+              noNameDiv.className = "no-match-txt";
+              noNameDiv.textContent = "No match found";  // textContent — safe, no XSS
+              noNameEl.replaceChildren(noNameDiv);
+              document.getElementById("match-conf").textContent =
+                `Best score: ${data.confidence}%`;
+              document.getElementById("ver-badge").textContent = "No match";
+            }
+          } else {
+            showErr("ver-err", data.detail || "Verification failed.");
+            document.getElementById("ver-badge").textContent = "Try again";
+          }
+        } catch (err) {
+          document.getElementById("ver-processing").classList.remove("show");
+          showErr("ver-err", "Network error: " + err.message);
+          document.getElementById("ver-badge").textContent = "Try again";
+        } finally {
+          document.getElementById("ver-snap-btn").disabled = false;
+          document.getElementById("ver-cam-btn").disabled  = false;
+        }
+      }, "image/jpeg", 0.92);
+    }
+
+    function resetVerResult() {
+      document.getElementById("match-card").classList.remove("show");
+      document.getElementById("ver-badge").textContent  = "Position your face in the oval";
+      document.getElementById("ver-badge").className    = "cam-hint-bar";
+      document.getElementById("ver-cam-round").classList.remove("ok");
+      document.getElementById("ver-cam-round").style.borderColor = "";
+      hideErr("ver-err");
+    }
+
+    function resetVerUI() {
+      document.getElementById("ver-video").srcObject  = null;
+      document.getElementById("ver-placeholder").style.display = "";
+      document.getElementById("ver-cam-round").className = "cam-round idle";
+      document.getElementById("ver-cam-btn").textContent = "Start Camera";
+      document.getElementById("ver-snap-btn").disabled   = true;
+      document.getElementById("ver-badge").textContent   = "Click \"Start Camera\" to begin";
+      document.getElementById("ver-badge").className     = "cam-hint-bar";
+      document.getElementById("match-card").classList.remove("show");
+      document.getElementById("ver-processing").classList.remove("show");
+      hideErr("ver-err");
+    }
+  </script>
+</body>
+</html>

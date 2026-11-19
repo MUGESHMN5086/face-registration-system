@@ -1,0 +1,9 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+pymongo==4.17.0
+opencv-python==5.0.0.93
+numpy==2.5.1
+insightface==1.0.1
+onnxruntime==1.29.0
+pydantic==2.13.4
+python-multipart==0.0.32
